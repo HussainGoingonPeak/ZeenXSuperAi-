@@ -13,3 +13,5 @@ export interface HistoryItem {
   style: string;
   imageUrl: string;
 }
+
+export type EnhancementStyle = 'Detailed' | 'JSON' | 'XML';

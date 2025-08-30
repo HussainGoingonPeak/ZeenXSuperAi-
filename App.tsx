@@ -4,19 +4,21 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 import { InputSection } from './components/InputSection';
 import { OutputSection } from './components/OutputSection';
 import { HistorySection } from './components/HistorySection';
-import { generateImage as generateImageService } from './services/geminiService';
+import { generateImage as generateImageService, upscaleImage as upscaleImageService, editImageWithPrompt as editImageWithPromptService } from './services/geminiService';
 import type { HistoryItem, AspectRatio, GenerationStyle } from './types';
 import { STYLES, DIMENSIONS } from './constants';
 
 const App: React.FC = () => {
   const [showWelcome, setShowWelcome] = useState(true);
   const [prompt, setPrompt] = useState<string>('');
-  const [style, setStyle] = useState<GenerationStyle>(STYLES[2]); // Default to Cyberpunk
+  const [style, setStyle] = useState<GenerationStyle>(STYLES.find(s => s.name === 'Cyberpunk') || STYLES[0]);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(DIMENSIONS[0].value);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isUpscaling, setIsUpscaling] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [generatedImage, setGeneratedImage] = useState<HistoryItem | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
 
   const handleEnterApp = () => {
     setShowWelcome(false);
@@ -24,33 +26,82 @@ const App: React.FC = () => {
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) {
-      setError('Please enter a prompt to generate an image.');
+      setError('Please enter a prompt.');
       return;
     }
+
     setIsLoading(true);
     setError(null);
     setGeneratedImage(null);
 
     try {
-      const fullPrompt = `${prompt}, ${style.promptSuffix}`;
-      const imageUrl = await generateImageService(fullPrompt, aspectRatio);
-      const newImage: HistoryItem = {
-        id: `gen_${Date.now()}`,
-        prompt: prompt,
-        fullPrompt: fullPrompt,
-        style: style.name,
-        imageUrl: imageUrl,
-      };
+      let imageUrl: string;
+      let newImage: HistoryItem;
+
+      if (uploadedImage) {
+        // Image editing flow
+        imageUrl = await editImageWithPromptService(uploadedImage, prompt);
+        newImage = {
+          id: `edit_${Date.now()}`,
+          prompt: prompt,
+          fullPrompt: `Edit applied: "${prompt}"`,
+          style: 'Image Edit',
+          imageUrl: imageUrl,
+        };
+      } else {
+        // Text-to-image flow
+        const fullPrompt = `${prompt}, ${style.promptSuffix}`;
+        imageUrl = await generateImageService(fullPrompt, aspectRatio);
+        newImage = {
+          id: `gen_${Date.now()}`,
+          prompt: prompt,
+          fullPrompt: fullPrompt,
+          style: style.name,
+          imageUrl: imageUrl,
+        };
+      }
+      
       setGeneratedImage(newImage);
       setHistory(prevHistory => [newImage, ...prevHistory.slice(0, 8)]); // Keep history to 9 items
+      setUploadedImage(null); // Clear uploaded image after generation
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred during image generation.');
+      setError(err instanceof Error ? err.message : 'An unknown error occurred during image generation/editing.');
     } finally {
       setIsLoading(false);
     }
-  }, [prompt, style, aspectRatio]);
+  }, [prompt, style, aspectRatio, uploadedImage]);
   
+  const handleUpscale = useCallback(async () => {
+    if (!generatedImage) {
+      setError('No image to upscale.');
+      return;
+    }
+    setIsUpscaling(true);
+    setError(null);
+
+    try {
+      const upscaledImageUrl = await upscaleImageService(generatedImage.imageUrl);
+      const upscaledImage: HistoryItem = {
+        ...generatedImage,
+        id: `upscaled_${generatedImage.id}`, // Give it a new ID to differentiate
+        imageUrl: upscaledImageUrl,
+      };
+      setGeneratedImage(upscaledImage);
+
+      // Update the item in history with its upscaled version
+      setHistory(prev => 
+        prev.map(item => item.id === generatedImage.id ? upscaledImage : item)
+      );
+
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'An unknown error occurred during image upscaling.');
+    } finally {
+      setIsUpscaling(false);
+    }
+  }, [generatedImage]);
+
   const handleSelectHistoryItem = (item: HistoryItem) => {
     setGeneratedImage(item);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -83,14 +134,19 @@ const App: React.FC = () => {
               aspectRatio={aspectRatio}
               setAspectRatio={setAspectRatio}
               isLoading={isLoading}
+              isUpscaling={isUpscaling}
               error={error}
               onGenerate={handleGenerate}
+              uploadedImage={uploadedImage}
+              setUploadedImage={setUploadedImage}
             />
           </div>
           <div className="flex flex-col gap-8">
             <OutputSection
               generatedImage={generatedImage}
               isLoading={isLoading}
+              isUpscaling={isUpscaling}
+              onUpscale={handleUpscale}
             />
           </div>
         </main>

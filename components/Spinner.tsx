@@ -3,15 +3,16 @@ import React from 'react';
 
 interface SpinnerProps {
   large?: boolean;
+  colorClass?: string;
 }
 
-export const Spinner: React.FC<SpinnerProps> = ({ large = false }) => {
+export const Spinner: React.FC<SpinnerProps> = ({ large = false, colorClass }) => {
   const sizeClasses = large ? 'h-10 w-10' : 'h-5 w-5';
-  const color = large ? 'text-lime-400' : 'text-black';
+  const defaultColor = large ? 'text-lime-400' : 'text-black';
 
   return (
     <svg
-      className={`animate-spin ${sizeClasses} ${color}`}
+      className={`animate-spin ${sizeClasses} ${colorClass || defaultColor}`}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"

@@ -4,10 +4,13 @@ import type { HistoryItem } from '../types';
 import { Spinner } from './Spinner';
 import { DownloadIcon } from './icons/DownloadIcon';
 import { ShareIcon } from './icons/ShareIcon';
+import { UpscaleIcon } from './icons/UpscaleIcon';
 
 interface OutputSectionProps {
   generatedImage: HistoryItem | null;
   isLoading: boolean;
+  isUpscaling: boolean;
+  onUpscale: () => void;
 }
 
 const ActionButton: React.FC<{
@@ -25,7 +28,7 @@ const ActionButton: React.FC<{
 );
 
 
-export const OutputSection: React.FC<OutputSectionProps> = ({ generatedImage, isLoading }) => {
+export const OutputSection: React.FC<OutputSectionProps> = ({ generatedImage, isLoading, isUpscaling, onUpscale }) => {
   
   const handleDownload = () => {
     if (!generatedImage) return;
@@ -61,7 +64,7 @@ export const OutputSection: React.FC<OutputSectionProps> = ({ generatedImage, is
   return (
     <div className="bg-lime-400/5 border border-lime-400/20 p-6 backdrop-blur-sm flex flex-col gap-4 h-full">
       <h2 className="text-2xl font-bold uppercase tracking-widest text-center animate-pulse-glow">Visual Output</h2>
-      <div className="aspect-square w-full bg-black border-2 border-lime-400/50 flex items-center justify-center overflow-hidden">
+      <div className="relative aspect-square w-full bg-black border-2 border-lime-400/50 flex items-center justify-center overflow-hidden">
         {isLoading && (
           <div className="text-center">
             <Spinner large={true} />
@@ -79,7 +82,7 @@ export const OutputSection: React.FC<OutputSectionProps> = ({ generatedImage, is
             <img 
               src={generatedImage.imageUrl} 
               alt={generatedImage.prompt}
-              className="w-full h-full object-contain" 
+              className={`w-full h-full object-contain transition-opacity duration-300 ${isUpscaling ? 'opacity-30' : ''}`} 
             />
             <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
               <p className="text-sm font-bold text-lime-300 line-clamp-3">"{generatedImage.prompt}"</p>
@@ -87,13 +90,23 @@ export const OutputSection: React.FC<OutputSectionProps> = ({ generatedImage, is
             </div>
            </div>
         )}
+        {isUpscaling && (
+          <div className="absolute inset-0 bg-black/50 z-10 flex flex-col items-center justify-center">
+            <Spinner large={true} />
+            <p className="mt-4 text-lime-400/80 animate-pulse">Enhancing to 4K...</p>
+          </div>
+        )}
       </div>
       <div className="flex gap-4">
-        <ActionButton onClick={handleDownload} disabled={!generatedImage}>
+        <ActionButton onClick={onUpscale} disabled={!generatedImage || isLoading || isUpscaling}>
+          {isUpscaling ? <Spinner colorClass="text-lime-400" /> : <UpscaleIcon />}
+          <span>{isUpscaling ? 'Upscaling...' : 'Upscale'}</span>
+        </ActionButton>
+        <ActionButton onClick={handleDownload} disabled={!generatedImage || isLoading || isUpscaling}>
           <DownloadIcon />
           <span>Download</span>
         </ActionButton>
-        <ActionButton onClick={handleShare} disabled={!generatedImage || !navigator.share}>
+        <ActionButton onClick={handleShare} disabled={!generatedImage || !navigator.share || isLoading || isUpscaling}>
           <ShareIcon />
           <span>Share</span>
         </ActionButton>
